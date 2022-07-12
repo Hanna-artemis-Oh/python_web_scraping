@@ -1,0 +1,65 @@
+# 설치(20.08 코랩 기준)
+!pip install Selenium
+!apt-get update # to update ubuntu to correctly run apt install
+!apt install chromium-chromedriver
+!cp /usr/lib/chromium-browser/chromedriver /usr/bin
+
+# 한글 폰트 설치
+!apt-get install -y fonts-nanum*
+
+from selenium import webdriver
+
+chrome_options = webdriver.ChromeOptions()
+chrome_options.add_argument('--headless') #내부 창을 띄울 수 없으므로 설정
+chrome_options.add_argument('--no-sandbox')
+chrome_options.add_argument('--disable-dev-shm-usage')
+
+
+from selenium import webdriver
+from selenium.webdriver.common.keys import Keys
+from selenium.webdriver.common.by import By
+
+from bs4 import BeautifulSoup as bs
+import time
+import pandas as pd
+
+# Chrome 드라이버 생성 후 Browser 객체 반환 
+driver = webdriver.Chrome('chromedriver', chrome_options=chrome_options)
+
+url_main = 'https://www.youtube.com'
+url_sub = '/results?search_query='
+query = '머신러닝'
+
+
+url = url_main + url_sub + query
+driver.get(url)
+driver.save_screenshot('youtube_00.png')
+
+# 현재 페이지에서 5번 스크롤링
+body = driver.find_element(By.TAG_NAME, 'body')
+for i in range(5):
+  body.send_keys(Keys.PAGE_DOWN)
+  driver.save_screenshot(f'youtube_{i+1:02}.png')
+  time.sleep(2)
+  
+# BeautifulSoup으로 웹 페이지 해석
+soup = bs(driver.page_source, 'html.parser')
+soup
+
+# 영상제목 / 영상주소 / 조회수 
+nums = []
+titles = [title.text for title in soup.select('a#video-title > yt-formatted-string') ]
+video_urls = [url_main + v_url['href'] for v_url in soup.select('a#video-title') ]
+views = [view.text.split()[0] for view in soup.select('div#metadata-line > span')[::2]]
+nums = range(1,len(titles)+1)
+
+
+# 정형데이터(판다스)로 변환
+df = pd.DataFrame({'num':nums, 'titles':titles, 'video_urls':video_urls, 'views':views})
+df.set_index('num', inplace=True)
+df.head()
+
+
+df.to_csv('youtube_search.csv', encoding='utf-8')
+
+driver.quit()
